@@ -89,10 +89,9 @@ class MOTNDP(gym.Env):
             render_mode (str): RENDERING IS NOT IMPLEMENTED YET.
         """
 
-        assert od_type in [
-            "pct",
-            "abs",
-        ], "Invalid Origin-Destination Type. Choose one of: pct, abs"
+        assert od_type in ["pct", "abs"], "Invalid Origin-Destination Type. Choose one of: pct, abs"
+        
+        assert state_representation in ["grid_coordinates", "grid_index", "one_hot", "multi_binary", "dictionary"], "Invalid State Representation. Choose one of: grid_coordinates, grid_index, one_hot, multi_binary"
 
         self.render_mode = render_mode
 
@@ -113,10 +112,13 @@ class MOTNDP(gym.Env):
             )
         elif state_representation == "grid_index" or state_representation == "one_hot":
             self.observation_space = spaces.Discrete(city.grid_size)
-        elif state_representation == "one_hot":
-            self.observation_space = spaces.Box(
-                low=0, high=1, shape=(city.grid_size,), dtype=np.int64
-            )
+        elif state_representation == "multi_binary":
+            self.observation_space = spaces.MultiBinary(city.grid_size)
+            # self.observation_space = spaces.Sequence(spaces.Discrete(city.grid_size))
+            # self.observation_space = spaces.Tuple(spaces.MultiBinary(city.grid_size), spaces.Discrete(city.grid_size))
+        elif state_representation == "dictionary":
+            # self.observation_space = spaces.Dict({'stations': spaces.MultiBinary(city.grid_size), 'location': spaces.Discrete(city.grid_size)})
+            self.observation_space = spaces.MultiBinary(city.grid_size * 2)
 
         self.action_space = spaces.Discrete(8)
         # Allowed actions are updated at each step, based on the current location
@@ -147,6 +149,20 @@ class MOTNDP(gym.Env):
             return self._loc_grid_index
         elif representation == "one_hot":
             return self.city.grid_to_one_hot(self._loc_grid_coordinates[None, :])
+        elif representation == "multi_binary":
+            multi_binary = np.zeros(self.city.grid_size, dtype=np.int8)
+            indices = self.city.grid_to_index(np.array(self.covered_cells_coordinates))
+            multi_binary[indices] = 1
+            return multi_binary
+        elif representation == "dictionary":
+            multi_binary = np.zeros(self.city.grid_size, dtype=np.int8)
+            indices = self.city.grid_to_index(np.array(self.covered_cells_coordinates))
+            multi_binary[indices] = 1
+            
+            location = self.city.grid_to_one_hot(self._loc_grid_coordinates[None, :])
+            return np.concatenate([multi_binary, location])
+        
+            # return {'stations': multi_binary, 'location': self.city.grid_to_one_hot(self._loc_grid_coordinates[None, :])} 
 
     def _get_info(self):
         return {
