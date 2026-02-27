@@ -41,10 +41,11 @@ Each grid cell represents a location associated with a specific group. The rewar
   - [Citing](#citing)
 
 ## Observation Space
-The observation space is flexible and can be set with the `state_representation` argument. It can be:
-- 'grid_coordinates': the agent's location in grid coordinates (x, y). For 'grid_coordinates', the observation space is a MultiDiscrete space with two dimensions: [grid_x_size, grid_y_size].
-- 'grid_index': the agent's location as a scalar index (0,0) -> 0, (0,1) -> 1, ..... For 'grid_index', the observation space is a Discrete space with the size of the grid.
-- 'one_hot': a one-hot vector of the agent's location in the grid. For 'one_hot', the observation space is a Box space with the shape of the grid.
+The observation is a concatenation of:
+- A multi-binary vector of length `grid_size` where each entry is 1 if the corresponding cell has been covered by a station.
+- A one-hot vector of length `grid_size` representing the agent's current location.
+
+The observation space is a `MultiBinary` space with shape `(2 * grid_size,)`.
 
 ## Action Space
 The actions is a discrete space where:
@@ -76,7 +77,6 @@ An episode terminates when the agent has placed all stations under the budget or
 - city (City): City object that contains the grid and the groups.
 - constraints (Constraints): Transport constraints object with the constraints on movement in the grid.
 - nr_stations (int): Episode length. Total number of stations to place (each station is an episode step).
-- state_representation (str): State representation. Can be 'grid_coordinates' (returns the agent's location in grid coordinates), 'grid_index' (scalar index of grid coordinates) or 'one_hot' (one-hot vector).
 - od_type (str): Type of Origin Destination metric. Can be 'pct' (returns the percentage of satisfied OD pairs for each group) or 'abs' (returns the absolute number of satisfied OD pairs for each group).
 - chained_reward (bool): If True, each new station will receive an additional reward based not only on the ODs covered between the immediate previous station, but also those before.
 - starting_loc (tuple): Set the default starting location of the agent in the grid. If None, the starting location is chosen randomly, or chosen in _reset().

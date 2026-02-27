@@ -22,10 +22,8 @@ class MOTNDP(gym.Env):
     Each grid cell represents a location associated with a specific group. The reward reflects the total OD demand satisfied for each group, either in absolute or percentage terms.
 
     ## Observation Space
-    The observation space is flexible and can be set with the `state_representation` argument. It can be:
-    - 'grid_coordinates': the agent's location in grid coordinates (x, y). For 'grid_coordinates', the observation space is a MultiDiscrete space with two dimensions: [grid_x_size, grid_y_size].
-    - 'grid_index': the agent's location as a scalar index (0,0) -> 0, (0,1) -> 1, ..... For 'grid_index', the observation space is a Discrete space with the size of the grid.
-    - 'one_hot': a one-hot vector of the agent's location in the grid. For 'one_hot', the observation space is a Box space with the shape of the grid.
+    The observation space is a concatenation of a multi-binary vector of covered cells and a one-hot vector of the agent's current location.
+    It is a MultiBinary space with shape (2 * grid_size,).
 
     ## Action Space
     The actions is a discrete space where:
@@ -54,7 +52,6 @@ class MOTNDP(gym.Env):
     - city (City): City object that contains the grid and the groups.
     - constraints (Constraints): Transport constraints object with the constraints on movement in the grid.
     - nr_stations (int): Episode length. Total number of stations to place (each station is an episode step).
-    - state_representation (str): State representation. Can be 'grid_coordinates' (returns the agent's location in grid coordinates), 'grid_index' (scalar index of grid coordinates) or 'one_hot' (one-hot vector).
     - od_type (str): Type of Origin Destination metric. Can be 'pct' (returns the percentage of satisfied OD pairs for each group) or 'abs' (returns the absolute number of satisfied OD pairs for each group).
     - chained_reward (bool): If True, each new station will receive an additional reward based not only on the ODs covered between the immediate previous station, but also those before.
     - starting_loc (tuple): Set the default starting location of the agent in the grid. If None, the starting location is chosen randomly, or chosen in _reset().
@@ -71,7 +68,6 @@ class MOTNDP(gym.Env):
         city: City,
         constraints: Constraints,
         nr_stations: int,
-        state_representation="grid_coordinates",
         od_type="pct",
         chained_reward=False,
         starting_loc=None,
@@ -82,7 +78,6 @@ class MOTNDP(gym.Env):
             city (City): City object that contains the grid and the groups.
             constraints (Constraints): Transport constraints object with the constraints on movement in the grid.
             nr_stations (int): Episode length. Total number of stations to place (each station is an episode step).
-            state_representation (str): State representation. Can be 'grid_coordinates' (returns the agent's location in grid coordinates), 'grid_index' (scalar index of grid coordinates) or 'one_hot' (one-hot vector).
             od_type (str): Type of Origin Destination metric. Can be 'pct' (returns the percentage of satisfied OD pairs for each group) or 'abs' (returns the absolute number of satisfied OD pairs for each group).
             chained_reward (bool): If True, each new station will receive an additional reward based not only on the ODs covered between the immediate previous station, but also those before.
             starting_loc (tuple): Set the default starting location of the agent in the grid. If None, the starting location is chosen randomly, or chosen in _reset().
@@ -90,8 +85,6 @@ class MOTNDP(gym.Env):
         """
 
         assert od_type in ["pct", "abs"], "Invalid Origin-Destination Type. Choose one of: pct, abs"
-        
-        assert state_representation in ["grid_coordinates", "grid_index", "one_hot", "multi_binary", "dictionary"], "Invalid State Representation. Choose one of: grid_coordinates, grid_index, one_hot, multi_binary"
 
         self.render_mode = render_mode
 
@@ -105,20 +98,7 @@ class MOTNDP(gym.Env):
         # If chained_reward is true, the reward received after the second action will be the OD between 2-3 AND 1-3, because station 1 and 3 are now connected (and therefore their demand is deemed satisfied).
         self.chained_reward = chained_reward
 
-        self.state_representation = state_representation
-        if state_representation == "grid_coordinates":
-            self.observation_space = spaces.MultiDiscrete(
-                [city.grid_x_size, city.grid_y_size]
-            )
-        elif state_representation == "grid_index" or state_representation == "one_hot":
-            self.observation_space = spaces.Discrete(city.grid_size)
-        elif state_representation == "multi_binary":
-            self.observation_space = spaces.MultiBinary(city.grid_size)
-            # self.observation_space = spaces.Sequence(spaces.Discrete(city.grid_size))
-            # self.observation_space = spaces.Tuple(spaces.MultiBinary(city.grid_size), spaces.Discrete(city.grid_size))
-        elif state_representation == "dictionary":
-            # self.observation_space = spaces.Dict({'stations': spaces.MultiBinary(city.grid_size), 'location': spaces.Discrete(city.grid_size)})
-            self.observation_space = spaces.MultiBinary(city.grid_size * 2)
+        self.observation_space = spaces.MultiBinary(city.grid_size * 2)
 
         self.action_space = spaces.Discrete(8)
         # Allowed actions are updated at each step, based on the current location
@@ -142,27 +122,12 @@ class MOTNDP(gym.Env):
         self.window = None
         self.clock = None
 
-    def get_agent_location(self, representation="grid_coordinates"):
-        if representation == "grid_coordinates":
-            return self._loc_grid_coordinates
-        elif representation == "grid_index":
-            return self._loc_grid_index
-        elif representation == "one_hot":
-            return self.city.grid_to_one_hot(self._loc_grid_coordinates[None, :])
-        elif representation == "multi_binary":
-            multi_binary = np.zeros(self.city.grid_size, dtype=np.int8)
-            indices = self.city.grid_to_index(np.array(self.covered_cells_coordinates))
-            multi_binary[indices] = 1
-            return multi_binary
-        elif representation == "dictionary":
-            multi_binary = np.zeros(self.city.grid_size, dtype=np.int8)
-            indices = self.city.grid_to_index(np.array(self.covered_cells_coordinates))
-            multi_binary[indices] = 1
-            
-            location = self.city.grid_to_one_hot(self._loc_grid_coordinates[None, :])
-            return np.concatenate([multi_binary, location])
-        
-            # return {'stations': multi_binary, 'location': self.city.grid_to_one_hot(self._loc_grid_coordinates[None, :])} 
+    def get_agent_location(self):
+        multi_binary = np.zeros(self.city.grid_size, dtype=np.int8)
+        indices = self.city.grid_to_index(np.array(self.covered_cells_coordinates))
+        multi_binary[indices] = 1
+        location = self.city.grid_to_one_hot(self._loc_grid_coordinates[None, :])
+        return np.concatenate([multi_binary, location])
 
     def _get_info(self):
         return {
@@ -279,7 +244,7 @@ class MOTNDP(gym.Env):
         self.connections_with_existing_lines = set()
 
         self._update_action_mask(self._loc_grid_coordinates)
-        observation = self.get_agent_location(self.state_representation)
+        observation = self.get_agent_location()
 
         if self.render_mode == "human":
             self.render()
@@ -329,7 +294,7 @@ class MOTNDP(gym.Env):
             self.stations_placed >= self.nr_stations or np.sum(self.action_mask) == 0
         )
 
-        observation = self.get_agent_location(self.state_representation)
+        observation = self.get_agent_location()
         info = self._get_info()
 
         if self.render_mode == "human":
