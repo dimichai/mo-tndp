@@ -184,13 +184,11 @@ I aim to gather data for various cities by referencing papers published on the t
 ## Citing
 ```bibtex
 If you use this environment in your paper, please cite:
-@misc{michailidis2024scalablemultiobjectivereinforcementlearning,
-      title={Scalable Multi-Objective Reinforcement Learning with Fairness Guarantees using Lorenz Dominance}, 
-      author={Dimitris Michailidis and Willem Röpke and Diederik M. Roijers and Sennay Ghebreab and Fernando P. Santos},
-      year={2024},
-      eprint={2411.18195},
-      archivePrefix={arXiv},
-      primaryClass={cs.LG},
-      url={https://arxiv.org/abs/2411.18195}, 
+@article{michailidis2026scalable,
+  title={Scalable multi-objective reinforcement learning with fairness guarantees using lorenz dominance},
+  author={Michailidis, Dimitris and R{\"o}pke, Willem and Roijers, Diederik M and Ghebreab, Sennay and Santos, Fernando P},
+  journal={Journal of Artificial Intelligence Research},
+  volume={85},
+  year={2026}
 }
 ```
